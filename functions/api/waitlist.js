@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
   });
   const outcome = await verify.json();
   if (!outcome.success) {
-    return json({ ok: false, reason: "challenge", debug: outcome["error-codes"] }, 403);
+    return json({ ok: false, reason: "challenge" }, 403);
   }
 
   // 4. Validation d'email
