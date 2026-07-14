@@ -385,7 +385,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
         </form>
-        <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-1"></div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAD1xJRugGk91t4iL" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-1"></div>
         <div class="success" id="success-msg" data-i18n="success">Merci ! Tu seras parmi les premiers informés.</div>
         <div class="error" data-i18n="error">Une erreur est survenue. Réessaie dans un instant.</div>
         <p class="note" data-i18n="note">Bêta privée en préparation sur iPhone, version Mac prévue ensuite. Pas de spam, juste l'essentiel.</p>
@@ -557,7 +557,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
         </form>
-        <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-2"></div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAD1xJRugGk91t4iL" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-2"></div>
         <div class="success" data-i18n="success">Merci ! Tu seras parmi les premiers informés.</div>
         <div class="error" data-i18n="error">Une erreur est survenue. Réessaie dans un instant.</div>
       </div>
@@ -580,8 +580,7 @@
   <script>
     // ————————————————————————————————————————————
     // L'endpoint est servi par la Pages Function : /functions/api/waitlist.js
-    // Remplace TURNSTILE_SITE_KEY (2 occurrences dans le HTML) par ta clé
-    // de site Turnstile (dashboard Cloudflare → Turnstile).
+    // Clé de site Turnstile configurée (dashboard Cloudflare → Turnstile).
     const WAITLIST_ENDPOINT = "/api/waitlist";
     const pageLoadedAt = Date.now(); // contrôle anti-bot : temps avant soumission
     // ————————————————————————————————————————————
