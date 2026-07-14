@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Letrel · Tout à sa place. Tout avance.</title>
+  <meta name="description" content="Letrel est un agent personnel privé, en développement pour iPhone. Confie-lui un document, une photo, une note : il trie, comprend le contexte et prépare tes prochaines actions, sans jamais quitter ton appareil.">
+  <meta property="og:title" content="Letrel · Tout à sa place. Tout avance.">
+  <meta property="og:description" content="L'agent personnel privé qui trie, relie et agit. En développement pour iPhone, local-first.">
+  <meta property="og:url" content="https://letrel.app">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="letrel-favicon.svg" type="image/svg+xml">
+  <script src="https://challenges.cloudflare.com/turnstile/api.js" async defer></script>
+  <style>
+    :root {
+      --paper: #FAF8F4;
+      --paper-deep: #F1EEE7;
+      --ink: #23281f;
+      --ink-soft: #5c6355;
+      --accent: #3E5C46;
+      --accent-bright: #4E7A5A;
+      --accent-soft: #E7EDE5;
+      --amber: #B07C3A;
+      --amber-soft: #F5EBDD;
+      --line: #E2DED4;
+      --radius: 14px;
+      --maxw: 1040px;
+      --shadow-soft: 0 2px 8px rgba(35,40,31,0.05), 0 12px 32px rgba(35,40,31,0.07);
+      --shadow-lift: 0 4px 12px rgba(35,40,31,0.08), 0 20px 48px rgba(35,40,31,0.12);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; position: relative; }
+
+    /* Ambient background */
+    .ambient {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(600px 400px at 15% 0%, rgba(78,122,90,0.10), transparent 70%),
+        radial-gradient(700px 500px at 90% 20%, rgba(176,124,58,0.07), transparent 70%),
+        radial-gradient(800px 600px at 50% 110%, rgba(78,122,90,0.08), transparent 70%),
+        var(--paper);
+    }
+    .ambient::after {
+      content: ""; position: absolute; inset: 0; opacity: 0.5;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.14 0 0 0 0 0.16 0 0 0 0 0.12 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* Reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .float { animation: none !important; }
+    }
+
+    /* Header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 0;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
+    .logo i { color: var(--accent-bright); font-style: normal; }
+    .logo svg { flex-shrink: 0; opacity: 0.95; }
+    .lang-toggle {
+      display: flex; gap: 2px; border: 1px solid var(--line); border-radius: 99px; padding: 3px;
+      background: rgba(255,255,255,0.8); backdrop-filter: blur(8px);
+    }
+    .lang-toggle button {
+      border: none; background: transparent; padding: 4px 12px; border-radius: 99px;
+      font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+      transition: all .2s;
+    }
+    .lang-toggle button.active { background: var(--ink); color: var(--paper); }
+
+    /* Hero */
+    .hero { padding: 64px 0 24px; text-align: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center;
+      font-size: 0.82rem; font-weight: 600; letter-spacing: 0.02em;
+      color: var(--accent); background: var(--accent-soft);
+      padding: 7px 16px; border-radius: 99px; margin-bottom: 28px;
+      border: 1px solid rgba(62,92,70,0.15);
+    }
+    h1 {
+      font-family: ui-serif, "New York", Georgia, "Times New Roman", serif;
+      font-size: clamp(2.5rem, 6.5vw, 4.4rem);
+      font-weight: 600; letter-spacing: -0.02em; line-height: 1.1;
+      max-width: 760px; margin: 0 auto 22px;
+    }
+    h1 em {
+      font-style: italic;
+      background: linear-gradient(120deg, var(--accent-bright), var(--amber));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero p.sub {
+      font-size: clamp(1.02rem, 2vw, 1.2rem); color: var(--ink-soft);
+      max-width: 640px; margin: 0 auto 36px;
+    }
+
+    /* Waitlist form : pilule unifiée */
+    .waitlist { max-width: 480px; margin: 0 auto; }
+    .waitlist form {
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; border: 1px solid var(--line); border-radius: 999px;
+      padding: 6px 6px 6px 22px;
+      box-shadow: var(--shadow-soft);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .waitlist form:focus-within {
+      border-color: var(--accent-bright);
+      box-shadow: 0 0 0 4px rgba(78,122,90,0.12), var(--shadow-soft);
+    }
+    .waitlist input[type="email"] {
+      flex: 1; min-width: 0; padding: 12px 0; font-size: 1rem; color: var(--ink);
+      border: none; background: transparent; outline: none; font-family: inherit;
+    }
+    .waitlist input[type="email"]::placeholder { color: #9aa091; }
+    .waitlist button {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 22px; font-size: 0.95rem; font-weight: 600; font-family: inherit;
+      color: #fff; border: none; border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+      cursor: pointer; white-space: nowrap;
+      transition: filter .2s, box-shadow .2s;
+      box-shadow: 0 2px 8px rgba(62,92,70,0.35);
+    }
+    .waitlist button:hover { filter: brightness(1.08); box-shadow: 0 4px 14px rgba(62,92,70,0.4); }
+    .waitlist button svg { flex-shrink: 0; }
+    .waitlist .note { font-size: 0.82rem; color: var(--ink-soft); margin-top: 13px; }
+    .waitlist .success {
+      display: none; padding: 16px 20px; background: var(--accent-soft);
+      border: 1px solid rgba(62,92,70,0.2);
+      border-radius: var(--radius); color: var(--accent); font-weight: 600;
+    }
+    .waitlist .error {
+      display: none; font-size: 0.85rem; color: #a04b2e; margin-top: 10px; font-weight: 600;
+    }
+    /* Honeypot : invisible pour les humains, rempli par les bots */
+    .hp-field {
+      position: absolute !important; left: -9999px !important;
+      width: 1px; height: 1px; overflow: hidden; opacity: 0;
+    }
+    /* Turnstile (interaction-only : invisible sauf pour le trafic suspect) */
+    .cf-turnstile { margin-top: 10px; display: flex; justify-content: center; }
+
+    /* ——— Demo visual ——— */
+    .demo {
+      position: relative; max-width: 720px; margin: 60px auto 0; padding: 0 12px 84px;
+    }
+    .demo-stage { position: relative; height: 400px; }
+    .demo-card {
+      position: absolute;
+      /* le hover ne déplace pas la carte : pas de saut souris entre/sort */
+    }
+    .float {
+      will-change: transform;
+      animation: floaty 6s ease-in-out infinite;
+    }
+    .demo-card:nth-child(2) .float { animation-duration: 7s; animation-delay: -2s; }
+    .demo-card:nth-child(3) .float { animation-duration: 8s; animation-delay: -4s; }
+    .demo-card:nth-child(4) .float { animation-duration: 6.5s; animation-delay: -1s; }
+    @keyframes floaty {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .card-inner {
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 16px; box-shadow: var(--shadow-soft);
+      padding: 16px 18px; text-align: left;
+      transition: box-shadow .3s ease, border-color .3s ease;
+    }
+    .demo-card:hover .card-inner { box-shadow: var(--shadow-lift); border-color: rgba(78,122,90,0.35); }
+    .demo-card:hover .float { animation-play-state: paused; }
+
+    /* Positions */
+    .demo-doc { left: 50%; top: 0; transform: translateX(-135%) rotate(-4deg); width: 215px; }
+    .demo-verdict { left: 50%; top: 30px; transform: translateX(10%) rotate(2.5deg); width: 265px; }
+    .demo-voice { left: 50%; top: 178px; transform: translateX(-120%) rotate(2deg); width: 240px; }
+    .demo-chat { left: 50%; top: 196px; transform: translateX(6%) rotate(-1.5deg); width: 250px; }
+
+    /* The scanned letter */
+    .demo-doc .doc-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+    .demo-doc .doc-ico {
+      width: 34px; height: 34px; border-radius: 9px; background: var(--amber-soft);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .demo-doc .doc-title { font-size: 0.83rem; font-weight: 650; line-height: 1.25; }
+    .demo-doc .doc-sub { font-size: 0.72rem; color: var(--ink-soft); }
+    .doc-lines { display: grid; gap: 6px; }
+    .doc-lines i { display: block; height: 7px; border-radius: 4px; background: var(--paper-deep); }
+    .doc-lines i:nth-child(1) { width: 90%; } .doc-lines i:nth-child(2) { width: 72%; }
+    .doc-lines i:nth-child(3) { width: 84%; } .doc-lines i:nth-child(4) { width: 45%; background: var(--amber-soft); }
+    .doc-scan {
+      position: absolute; left: 0; right: 0; height: 42px; top: 30%;
+      background: linear-gradient(180deg, transparent, rgba(78,122,90,0.14), transparent);
+      border-top: 1px solid rgba(78,122,90,0.35); border-bottom: 1px solid rgba(78,122,90,0.35);
+      animation: scan 3.4s ease-in-out infinite; pointer-events: none; border-radius: 4px;
+      will-change: transform, opacity;
+    }
+    @keyframes scan {
+      0%, 12% { transform: translateY(0); opacity: 0; }
+      22% { opacity: 1; }
+      62% { transform: translateY(150px); opacity: 1; }
+      76%, 100% { transform: translateY(150px); opacity: 0; }
+    }
+
+    /* Verdict card */
+    .verdict-row { display: flex; gap: 10px; align-items: flex-start; }
+    .chip {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; margin-top: 2px;
+    }
+    .chip.amber { background: var(--amber-soft); }
+    .chip.green { background: var(--accent-soft); }
+    .verdict-t { font-size: 0.86rem; font-weight: 650; line-height: 1.3; }
+    .verdict-s { font-size: 0.76rem; color: var(--ink-soft); margin-top: 3px; }
+    .verdict-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 10px; font-size: 0.72rem; font-weight: 600; color: var(--accent);
+      background: var(--accent-soft); padding: 4px 10px; border-radius: 99px;
+    }
+
+    /* Voice note card */
+    .voice-head { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+    .voice-ico {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .wave { display: flex; align-items: center; gap: 3px; height: 20px; }
+    .wave i { display: block; width: 3px; border-radius: 2px; background: var(--accent-bright); opacity: .75; }
+    .wave i:nth-child(1) { height: 30%; } .wave i:nth-child(2) { height: 70%; }
+    .wave i:nth-child(3) { height: 100%; } .wave i:nth-child(4) { height: 55%; }
+    .wave i:nth-child(5) { height: 85%; } .wave i:nth-child(6) { height: 40%; }
+    .wave i:nth-child(7) { height: 65%; } .wave i:nth-child(8) { height: 25%; }
+    .voice-q { font-size: 0.82rem; font-style: italic; color: var(--ink-soft); }
+
+    /* Chat bubble */
+    .demo-chat .card-inner { background: var(--ink); border: none; color: var(--paper); }
+    .demo-chat .q { font-size: 0.8rem; color: #b9c0b0; font-style: italic; }
+    .demo-chat .a { font-size: 0.86rem; font-weight: 600; margin-top: 7px; display: flex; gap: 7px; align-items: baseline; }
+    .demo-chat .a::before { content: "→"; color: var(--accent-bright); font-weight: 700; }
+
+    .demo::after {
+      content: ""; position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+      width: 1px; height: 48px;
+      background: linear-gradient(180deg, var(--line), transparent);
+    }
+
+    /* Sections */
+    h2 {
+      font-family: ui-serif, "New York", Georgia, serif;
+      font-size: clamp(1.6rem, 3.6vw, 2.3rem); font-weight: 600; letter-spacing: -0.015em;
+      text-align: center; line-height: 1.2;
+    }
+
+    .how { padding: 40px 0 64px; }
+    .how .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+    .card {
+      background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 16px;
+      padding: 28px 24px; text-align: left; position: relative;
+      transition: box-shadow .3s ease, border-color .3s ease;
+    }
+    .card:hover { box-shadow: var(--shadow-lift); border-color: rgba(78,122,90,0.35); }
+    .card .ico {
+      width: 42px; height: 42px; border-radius: 12px; background: var(--accent-soft);
+      display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+      color: var(--accent);
+    }
+    .card h3 { font-size: 1.06rem; font-weight: 650; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .card p { font-size: 0.92rem; color: var(--ink-soft); }
+    .card .num {
+      position: absolute; top: 22px; right: 22px;
+      font-family: ui-serif, Georgia, serif; font-size: 2rem; font-weight: 600;
+      color: var(--paper-deep); line-height: 1;
+    }
+
+    .pillars { padding: 24px 0 72px; }
+    .pillars .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+
+    /* Trust */
+    .trust {
+      position: relative; overflow: hidden;
+      background: linear-gradient(160deg, #262b22, #1d2419);
+      color: var(--paper);
+      border-radius: 24px;
+      padding: 64px 40px; margin: 24px 0 80px; text-align: center;
+    }
+    .trust::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(500px 300px at 80% -10%, rgba(78,122,90,0.35), transparent 70%),
+                  radial-gradient(400px 300px at 10% 110%, rgba(176,124,58,0.18), transparent 70%);
+    }
+    .trust > * { position: relative; }
+    .trust .lock {
+      width: 52px; height: 52px; border-radius: 15px; margin: 0 auto 22px;
+      background: rgba(250,248,244,0.08); border: 1px solid rgba(250,248,244,0.15);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .trust h2 { color: var(--paper); }
+    .trust p.big {
+      font-size: clamp(1.02rem, 2.3vw, 1.22rem); max-width: 640px; margin: 20px auto 0;
+      color: #cbd1c3;
+    }
+    .trust .quote {
+      font-family: ui-serif, "New York", Georgia, serif; font-style: italic;
+      font-size: clamp(1.15rem, 2.7vw, 1.5rem); color: var(--paper);
+      max-width: 580px; margin: 32px auto 0; line-height: 1.4;
+    }
+    .trust .badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 36px; }
+    .trust .badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.82rem; font-weight: 600; padding: 9px 16px;
+      border: 1px solid rgba(250,248,244,0.2); border-radius: 99px; color: #cbd1c3;
+      background: rgba(250,248,244,0.04);
+      transition: all .25s;
+    }
+    .trust .badge:hover { border-color: rgba(78,122,90,0.8); color: var(--paper); background: rgba(78,122,90,0.15); }
+    .trust .badge svg { color: var(--accent-bright); flex-shrink: 0; }
+
+    /* Bottom CTA */
+    .bottom-cta { text-align: center; padding: 8px 0 90px; }
+    .bottom-cta h2 { margin-bottom: 28px; }
+
+    footer {
+      border-top: 1px solid var(--line); padding: 28px 0 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.85rem; color: var(--ink-soft); flex-wrap: wrap; gap: 10px;
+    }
+    footer a { color: var(--ink-soft); }
+
+    @media (max-width: 720px) {
+      .how .steps, .pillars .grid { grid-template-columns: 1fr; }
+      .hero { padding: 44px 0 16px; }
+      .trust { padding: 48px 24px; }
+      /* Formulaire empilé */
+      .waitlist form { flex-direction: column; align-items: stretch; border-radius: 20px; padding: 8px; gap: 8px; }
+      .waitlist input[type="email"] { padding: 12px 16px; text-align: center; }
+      .waitlist button { justify-content: center; }
+      /* Demo devient une pile verticale */
+      .demo { padding-bottom: 56px; }
+      .demo-stage { height: auto; display: grid; gap: 14px; }
+      .demo-card { position: static; width: 100% !important; transform: none !important; }
+      .float { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient"></div>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        <svg width="19" height="21" viewBox="0 0 400 450" fill="none" aria-hidden="true">
+          <path d="M72 0C52.9044 0 34.5909 7.47375 21.0883 20.7771C7.58569 34.0805 0 52.1237 0 70.9375L0 156.062C0 174.876 7.58569 192.92 21.0883 206.223C34.5909 219.526 52.9044 227 72 227H144V70.9375C144 52.1237 136.414 34.0805 122.912 20.7771C109.409 7.47375 91.0956 0 72 0Z" fill="#2A362A"/>
+          <path d="M0 303.846C8.8 320.192 22.4 334.615 39.2 342.308C50.4 347.115 61.6 350 73.6 350H358.4C369.433 350 380.014 355.268 387.816 364.645C395.617 374.021 400 386.739 400 400C400 413.261 395.617 425.979 387.816 435.355C380.014 444.732 369.433 450 358.4 450H73.6C32.8 450 0 410.577 0 361.538V303.846Z" fill="#2A362A"/>
+          <path d="M0 193C8.8 209.217 22.4 223.526 39.2 231.158C50.4 235.928 61.6 238.789 73.6 238.789H358.4C369.433 238.789 380.014 244.016 387.816 253.319C395.617 262.621 400 275.239 400 288.395C400 301.551 395.617 314.168 387.816 323.471C380.014 332.774 369.433 338 358.4 338H73.6C32.8 338 0 298.888 0 250.237V193Z" fill="#80927F"/>
+          <path d="M341.207 123H400V175C400 188.791 394.605 202.018 385.002 211.77C375.399 221.521 362.374 227 348.793 227H290V175C290 161.209 295.395 147.982 304.998 138.23C314.601 128.479 327.626 123 341.207 123Z" fill="#9A682E"/>
+        </svg>
+        <span>Letrel<i>.</i></span>
+      </div>
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button id="btn-fr" class="active" onclick="setLang('fr')">FR</button>
+        <button id="btn-en" onclick="setLang('en')">EN</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <span class="eyebrow" data-i18n="eyebrow">Agent personnel privé · en développement pour iPhone</span>
+      <h1 data-i18n="h1">Tout à sa place.<br><em>Tout avance.</em></h1>
+      <p class="sub" data-i18n="sub">Un courrier, un contrat, une photo, un vocal ou le résumé d'un appel&nbsp;:<br>Letrel trie tout ce que tu lui confies, le relie à ton contexte et prépare tes prochaines actions, sans jamais quitter ton iPhone.</p>
+      <div class="waitlist">
+        <form id="waitlist-form" onsubmit="return submitWaitlist(event)">
+          <input type="email" id="email" required data-i18n-placeholder="placeholder" placeholder="ton@email.com" aria-label="Email">
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button type="submit">
+            <span data-i18n="cta">Rejoindre la liste d'attente</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </form>
+        <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-1"></div>
+        <div class="success" id="success-msg" data-i18n="success">Merci ! Tu seras parmi les premiers informés.</div>
+        <div class="error" data-i18n="error">Une erreur est survenue. Réessaie dans un instant.</div>
+        <p class="note" data-i18n="note">Bêta privée en préparation sur iPhone, version Mac prévue ensuite. Pas de spam, juste l'essentiel.</p>
+      </div>
+
+      <!-- Démo visuelle : le geste du produit -->
+      <div class="demo" aria-hidden="true">
+        <div class="demo-stage">
+          <div class="demo-card demo-doc">
+            <div class="float">
+              <div class="card-inner">
+                <div class="doc-scan"></div>
+                <div class="doc-head">
+                  <div class="doc-ico">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#B07C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </div>
+                  <div>
+                    <div class="doc-title" data-i18n="d_doc_t">Avis d'échéance</div>
+                    <div class="doc-sub" data-i18n="d_doc_s">Assurance habitation</div>
+                  </div>
+                </div>
+                <div class="doc-lines"><i></i><i></i><i></i><i></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-card demo-verdict">
+            <div class="float">
+              <div class="card-inner">
+                <div class="verdict-row">
+                  <div class="chip amber">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B07C3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </div>
+                  <div>
+                    <div class="verdict-t" data-i18n="d_v2_t">Une action : payer avant le 15.</div>
+                    <div class="verdict-s" data-i18n="d_v2_s">Taxe foncière · 634 €</div>
+                    <span class="verdict-badge">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <span data-i18n="d_v2_b">Ajouté au calendrier</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-card demo-voice">
+            <div class="float">
+              <div class="card-inner">
+                <div class="voice-head">
+                  <div class="voice-ico">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3E5C46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                  </div>
+                  <div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="voice-q" data-i18n="d_vo_q">«&nbsp;Pense à résilier la box en août&nbsp;»</div>
+                <span class="verdict-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span data-i18n="d_vo_b">Rappel créé · 1er août</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-card demo-chat">
+            <div class="float">
+              <div class="card-inner">
+                <div class="q" data-i18n="d_c_q">«&nbsp;C'est quand mon contrôle technique&nbsp;?&nbsp;»</div>
+                <div class="a" data-i18n="d_c_a">Le 12 mars. Rappel prévu deux semaines avant.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="how reveal">
+      <h2 data-i18n="how_title">Dépose. C'est trié. Ça avance.</h2>
+      <div class="steps">
+        <div class="card">
+          <span class="num">1</span>
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <h3 data-i18n="s1_t">Confie-lui tout</h3>
+          <p data-i18n="s1_p">Photographie un courrier, partage un PDF, dicte une note ou colle le résumé d'un appel. Tout entre en trois secondes.</p>
+        </div>
+        <div class="card">
+          <span class="num">2</span>
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="6.5" r="2.5"/><circle cx="18.5" cy="6.5" r="2.5"/><circle cx="12" cy="17.5" r="2.5"/><path d="M7.7 8.2 10.3 15.4M16.3 8.2 13.7 15.4M8 6.5h8"/></svg>
+          </div>
+          <h3 data-i18n="s2_t">Il trie, puis il relie</h3>
+          <p data-i18n="s2_p">Chaque élément est reconnu, nommé et rangé au bon endroit, puis relié aux personnes, contrats et échéances qu'il concerne.</p>
+        </div>
+        <div class="card">
+          <span class="num">3</span>
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <h3 data-i18n="s3_t">La suite est déjà prête</h3>
+          <p data-i18n="s3_p">Rien à faire, ou une action précise : l'échéance au calendrier, la réponse rédigée, le rappel au bon moment.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="pillars reveal">
+      <h2 data-i18n="p_title">Plus qu'un scanner. Un agent qui fait avancer.</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <h3 data-i18n="p1_t">Le tri, d'abord</h3>
+          <p data-i18n="p1_p">Documents, photos, notes : Letrel reconnaît, nomme et range automatiquement ce qui appartient ensemble. C'est le socle de tout le reste.</p>
+        </div>
+        <div class="card">
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2"/></svg>
+          </div>
+          <h3 data-i18n="p2_t">Le contexte compte</h3>
+          <p data-i18n="p2_p">Rien n'est lu isolément : chaque élément est interprété avec les personnes, les contrats et l'historique qui l'entourent. Et tu peux tout questionner.</p>
+        </div>
+        <div class="card">
+          <div class="ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </div>
+          <h3 data-i18n="p3_t">Il prend les devants</h3>
+          <p data-i18n="p3_p">Échéances posées au calendrier, rappels, réponses préparées, automatisations que tu autorises. Jusqu'aux appels passés pour toi, à terme.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust reveal">
+      <div class="lock">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E7A5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h2 data-i18n="t_title">Privé, par architecture</h2>
+      <p class="big" data-i18n="t_p">Letrel est conçu local-first&nbsp;: l'IA tourne directement sur la puce neuronale des iPhone récents (Apple Intelligence). Ce que tu lui confies est traité sur ton appareil et reste dans ton iCloud. Aucun serveur Letrel ne le stocke.</p>
+      <p class="quote" data-i18n="t_quote">«&nbsp;Tes documents ne quittent jamais ton iPhone. On ne peut pas les lire, même si on le voulait.&nbsp;»</p>
+      <div class="badges">
+        <span class="badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <span data-i18n="b1">IA locale, sur la puce de l'iPhone</span>
+        </span>
+        <span class="badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/><circle cx="12" cy="12" r="10"/></svg>
+          <span data-i18n="b2">Zéro document sur nos serveurs</span>
+        </span>
+        <span class="badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span data-i18n="b3">Pas d'accès à ta boîte mail</span>
+        </span>
+        <span class="badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span data-i18n="b4">Pas de connexion bancaire</span>
+        </span>
+      </div>
+    </section>
+
+    <section class="bottom-cta reveal">
+      <h2 data-i18n="cta2_title">Ta paperasse mérite mieux que la pile.</h2>
+      <div class="waitlist">
+        <form onsubmit="return submitWaitlist(event, this)">
+          <input type="email" required data-i18n-placeholder="placeholder" placeholder="ton@email.com" aria-label="Email">
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button type="submit">
+            <span data-i18n="cta">Rejoindre la liste d'attente</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </form>
+        <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY" data-appearance="interaction-only" data-response-field-name="cf-turnstile-response-2"></div>
+        <div class="success" data-i18n="success">Merci ! Tu seras parmi les premiers informés.</div>
+        <div class="error" data-i18n="error">Une erreur est survenue. Réessaie dans un instant.</div>
+      </div>
+    </section>
+
+    <footer>
+      <div style="display:flex; align-items:center; gap:9px">
+        <svg width="15" height="17" viewBox="0 0 400 450" fill="none" aria-hidden="true">
+          <path d="M72 0C52.9044 0 34.5909 7.47375 21.0883 20.7771C7.58569 34.0805 0 52.1237 0 70.9375L0 156.062C0 174.876 7.58569 192.92 21.0883 206.223C34.5909 219.526 52.9044 227 72 227H144V70.9375C144 52.1237 136.414 34.0805 122.912 20.7771C109.409 7.47375 91.0956 0 72 0Z" fill="#2A362A"/>
+          <path d="M0 303.846C8.8 320.192 22.4 334.615 39.2 342.308C50.4 347.115 61.6 350 73.6 350H358.4C369.433 350 380.014 355.268 387.816 364.645C395.617 374.021 400 386.739 400 400C400 413.261 395.617 425.979 387.816 435.355C380.014 444.732 369.433 450 358.4 450H73.6C32.8 450 0 410.577 0 361.538V303.846Z" fill="#2A362A"/>
+          <path d="M0 193C8.8 209.217 22.4 223.526 39.2 231.158C50.4 235.928 61.6 238.789 73.6 238.789H358.4C369.433 238.789 380.014 244.016 387.816 253.319C395.617 262.621 400 275.239 400 288.395C400 301.551 395.617 314.168 387.816 323.471C380.014 332.774 369.433 338 358.4 338H73.6C32.8 338 0 298.888 0 250.237V193Z" fill="#80927F"/>
+          <path d="M341.207 123H400V175C400 188.791 394.605 202.018 385.002 211.77C375.399 221.521 362.374 227 348.793 227H290V175C290 161.209 295.395 147.982 304.998 138.23C314.601 128.479 327.626 123 341.207 123Z" fill="#9A682E"/>
+        </svg>
+        <span>© 2026 Letrel · <span data-i18n="f_status">en développement pour iPhone, prévu sur Mac</span></span>
+      </div>
+      <div><a href="mailto:hello@letrel.app">hello@letrel.app</a></div>
+    </footer>
+  </div>
+
+  <script>
+    // ————————————————————————————————————————————
+    // L'endpoint est servi par la Pages Function : /functions/api/waitlist.js
+    // Remplace TURNSTILE_SITE_KEY (2 occurrences dans le HTML) par ta clé
+    // de site Turnstile (dashboard Cloudflare → Turnstile).
+    const WAITLIST_ENDPOINT = "/api/waitlist";
+    const pageLoadedAt = Date.now(); // contrôle anti-bot : temps avant soumission
+    // ————————————————————————————————————————————
+
+    const i18n = {
+      fr: {
+        eyebrow: "Agent personnel privé · en développement pour iPhone",
+        h1: "Tout à sa place.<br><em>Tout avance.</em>",
+        sub: "Un courrier, un contrat, une photo, un vocal ou le résumé d'un appel&nbsp;:<br>Letrel trie tout ce que tu lui confies, le relie à ton contexte et prépare tes prochaines actions, sans jamais quitter ton iPhone.",
+        placeholder: "ton@email.com",
+        cta: "Rejoindre la liste d'attente",
+        success: "Merci ! Tu seras parmi les premiers informés.",
+        error: "Une erreur est survenue. Réessaie dans un instant.",
+        note: "Bêta privée en préparation sur iPhone, version Mac prévue ensuite. Pas de spam, juste l'essentiel.",
+        d_doc_t: "Avis d'échéance",
+        d_doc_s: "Assurance habitation",
+        d_v2_t: "Une action : payer avant le 15.",
+        d_v2_s: "Taxe foncière · 634 €",
+        d_v2_b: "Ajouté au calendrier",
+        d_vo_q: "«&nbsp;Pense à résilier la box en août&nbsp;»",
+        d_vo_b: "Rappel créé · 1er août",
+        d_c_q: "«&nbsp;C'est quand mon contrôle technique&nbsp;?&nbsp;»",
+        d_c_a: "Le 12 mars. Rappel prévu deux semaines avant.",
+        how_title: "Dépose. C'est trié. Ça avance.",
+        s1_t: "Confie-lui tout",
+        s1_p: "Photographie un courrier, partage un PDF, dicte une note ou colle le résumé d'un appel. Tout entre en trois secondes.",
+        s2_t: "Il trie, puis il relie",
+        s2_p: "Chaque élément est reconnu, nommé et rangé au bon endroit, puis relié aux personnes, contrats et échéances qu'il concerne.",
+        s3_t: "La suite est déjà prête",
+        s3_p: "Rien à faire, ou une action précise : l'échéance au calendrier, la réponse rédigée, le rappel au bon moment.",
+        p_title: "Plus qu'un scanner. Un agent qui fait avancer.",
+        p1_t: "Le tri, d'abord",
+        p1_p: "Documents, photos, notes : Letrel reconnaît, nomme et range automatiquement ce qui appartient ensemble. C'est le socle de tout le reste.",
+        p2_t: "Le contexte compte",
+        p2_p: "Rien n'est lu isolément : chaque élément est interprété avec les personnes, les contrats et l'historique qui l'entourent. Et tu peux tout questionner.",
+        p3_t: "Il prend les devants",
+        p3_p: "Échéances posées au calendrier, rappels, réponses préparées, automatisations que tu autorises. Jusqu'aux appels passés pour toi, à terme.",
+        t_title: "Privé, par architecture",
+        t_p: "Letrel est conçu local-first&nbsp;: l'IA tourne directement sur la puce neuronale des iPhone récents (Apple Intelligence). Ce que tu lui confies est traité sur ton appareil et reste dans ton iCloud. Aucun serveur Letrel ne le stocke.",
+        t_quote: "«&nbsp;Tes documents ne quittent jamais ton iPhone. On ne peut pas les lire, même si on le voulait.&nbsp;»",
+        b1: "IA locale, sur la puce de l'iPhone",
+        b2: "Zéro document sur nos serveurs",
+        b3: "Pas d'accès à ta boîte mail",
+        b4: "Pas de connexion bancaire",
+        cta2_title: "Ta paperasse mérite mieux que la pile.",
+        f_status: "en développement pour iPhone, prévu sur Mac",
+        title: "Letrel · Tout à sa place. Tout avance.",
+      },
+      en: {
+        eyebrow: "Private personal agent · in development for iPhone",
+        h1: "Everything in its place.<br><em>Everything moves forward.</em>",
+        sub: "A letter, a contract, a photo, a voice note or a call summary:<br>Letrel sorts everything you share, links it to your context, and prepares your next steps, without ever leaving your iPhone.",
+        placeholder: "you@email.com",
+        cta: "Join the waitlist",
+        success: "Thank you! You'll be among the first to know.",
+        error: "Something went wrong. Please try again in a moment.",
+        note: "Private beta in the making for iPhone, Mac version planned next. No spam, just the essentials.",
+        d_doc_t: "Payment notice",
+        d_doc_s: "Home insurance",
+        d_v2_t: "One action: pay before the 15th.",
+        d_v2_s: "Property tax · €634",
+        d_v2_b: "Added to calendar",
+        d_vo_q: "“Remind me to cancel the internet plan in August”",
+        d_vo_b: "Reminder set · August 1st",
+        d_c_q: "“When is my car inspection due?”",
+        d_c_a: "March 12th. Reminder set two weeks before.",
+        how_title: "Drop it in. It's sorted. It moves forward.",
+        s1_t: "Hand it anything",
+        s1_p: "Snap a letter, share a PDF, dictate a note or paste a call summary. Everything goes in within three seconds.",
+        s2_t: "It sorts, then connects",
+        s2_p: "Each item is recognized, named and filed where it belongs, then linked to the people, contracts and deadlines it involves.",
+        s3_t: "What's next is ready",
+        s3_p: "Nothing to do, or one clear action: the deadline on your calendar, the reply drafted, the reminder at the right time.",
+        p_title: "More than a scanner. An agent that moves things forward.",
+        p1_t: "Sorting comes first",
+        p1_p: "Documents, photos, notes: Letrel recognizes, names, and files what belongs together. It's the foundation for everything else.",
+        p2_t: "Context matters",
+        p2_p: "Nothing is read in isolation: every item is interpreted with the people, contracts and history around it. And you can question everything.",
+        p3_t: "It takes the lead",
+        p3_p: "Deadlines on your calendar, reminders, prepared replies, automations you approve. All the way to calls made for you, in time.",
+        t_title: "Private, by architecture",
+        t_p: "Letrel is built local-first: the AI runs directly on the neural chip of recent iPhones (Apple Intelligence). What you share is processed on your device and stays in your iCloud. No Letrel server ever stores it.",
+        t_quote: "“Your documents never leave your iPhone. We couldn't read them, even if we wanted to.”",
+        b1: "On-device AI, on the iPhone's chip",
+        b2: "Zero documents on our servers",
+        b3: "No access to your inbox",
+        b4: "No bank connection",
+        cta2_title: "Your paperwork deserves better than the pile.",
+        f_status: "in development for iPhone, planned for Mac",
+        title: "Letrel · Everything in its place. Everything moves forward.",
+      }
+    };
+
+    function setLang(lang) {
+      document.documentElement.lang = lang;
+      document.title = i18n[lang].title;
+      document.getElementById('btn-fr').classList.toggle('active', lang === 'fr');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[lang][key]) el.innerHTML = i18n[lang][key];
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (i18n[lang][key]) el.placeholder = i18n[lang][key];
+      });
+      try { localStorage.setItem('letrel-lang', lang); } catch (e) {}
+    }
+
+    (function initLang() {
+      let saved = null;
+      try { saved = localStorage.getItem('letrel-lang'); } catch (e) {}
+      const browser = (navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+      setLang(saved || browser);
+    })();
+
+    // Reveal on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    async function submitWaitlist(event, formEl) {
+      event.preventDefault();
+      const form = formEl || document.getElementById('waitlist-form');
+      const parent = form.parentElement;
+      const email = form.querySelector('input[type="email"]').value;
+      const honeypot = form.querySelector('input[name="website"]').value;
+      const tsInput = parent.querySelector('input[name^="cf-turnstile-response"]');
+      const token = tsInput ? tsInput.value : '';
+      const btn = form.querySelector('button');
+      const errorBox = parent.querySelector('.error');
+      btn.disabled = true;
+      if (errorBox) errorBox.style.display = 'none';
+
+      try {
+        const res = await fetch(WAITLIST_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            lang: document.documentElement.lang,
+            token: token,
+            website: honeypot,               // honeypot : doit rester vide
+            t: Date.now() - pageLoadedAt     // temps écoulé depuis le chargement
+          })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+
+        form.style.display = 'none';
+        const ts = parent.querySelector('.cf-turnstile');
+        if (ts) ts.style.display = 'none';
+        const success = parent.querySelector('.success');
+        if (success) success.style.display = 'block';
+      } catch (e) {
+        btn.disabled = false;
+        if (errorBox) errorBox.style.display = 'block';
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>
